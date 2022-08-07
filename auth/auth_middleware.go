@@ -19,16 +19,20 @@ func AuthVerification(next echo.HandlerFunc)(echo.HandlerFunc){
 			panic(echo.NewHTTPError(http.StatusUnprocessableEntity, "Please relogin"))
 		}
 
-		claim := VerifyCookie(cookie)
+		claim, cErr := VerifyCookie(cookie)
+
+		if cErr != nil {
+			panic(echo.NewHTTPError(http.StatusUnprocessableEntity, "Please relogin"))
+		}
 
 		//will only renew within 1 minutes before token expires
 		if time.Unix(claim.ExpiresAt, 0).Sub(time.Now()) > 60*time.Second {
 			return next(c)
 		}
 
-		access, err := GenerateAccessToken(claim.Username)
+		access, aErr := GenerateAccessToken(claim.Username)
 
-		if (err != nil) {
+		if (aErr != nil) {
 			panic(echo.NewHTTPError(http.StatusUnprocessableEntity, "Please relogin"))
 		}
 	

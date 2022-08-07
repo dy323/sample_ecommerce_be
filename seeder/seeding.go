@@ -1,18 +1,16 @@
 package main
 
 import (
-	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"os"
-	seed "ecommerce/seeder/seed"
+	"ecommerce/seeder/seed"
+	"ecommerce/config"
 )
 
+var envData = config.EnvConfig()
+
 func main() {
-	godotenv.Load("../.env")
-	
-	db_connect := os.Getenv("DB_HOST")
-	db, err := gorm.Open(postgres.Open(db_connect), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open((*envData).DB_HOST), &gorm.Config{})
 
 	dba, err := db.DB()
 

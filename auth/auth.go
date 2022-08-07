@@ -3,11 +3,8 @@ package auth
 import (
 	"errors"
 	"net/http"
-	"os"
-	"github.com/labstack/echo/v4"
 	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/bcrypt"
-	"github.com/joho/godotenv"
 	"time"
 	"crypto/aes"
     "crypto/cipher"
@@ -15,7 +12,10 @@ import (
     "fmt"
     "io"
 	"net/smtp"
+	"ecommerce/config"
 )
+
+var envData = config.EnvConfig()
 
 type claims struct {
 	Username string `json: "username`
@@ -30,8 +30,6 @@ func CheckPsw(saved, hash string) bool {
 
 //on login func
 func GenerateAccessToken(user string)(string, error) {
-	godotenv.Load(".env")
-	secret_key := os.Getenv("SECRET_KEY")
 
 	claimData:= &claims {
 		Username: user,
@@ -42,7 +40,7 @@ func GenerateAccessToken(user string)(string, error) {
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claimData)
 
-	tokenData, err := token.SignedString([]byte(secret_key))
+	tokenData, err := token.SignedString([]byte((*envData).SECRET_KEY))
 
 	return tokenData, err
 }
@@ -60,29 +58,15 @@ func SetCookie(tokenData string)(*http.Cookie){
 }
 
 //on login func
-func VerifyCookie(cookie *http.Cookie) *claims {
-	godotenv.Load(".env")
-	secret_key := os.Getenv("SECRET_KEY")
+func VerifyCookie(cookie *http.Cookie) (*claims, error) {
 
 	claimData := new(claims)
 
-	token, err := jwt.ParseWithClaims(cookie.Value, claimData, func(token *jwt.Token) (interface{}, error) {
-		return []byte(secret_key), nil
+	_, err := jwt.ParseWithClaims(cookie.Value, claimData, func(token *jwt.Token) (interface{}, error) {
+		return []byte((*envData).SECRET_KEY), nil
 	})
 
-	if err != nil {
-		if err == jwt.ErrSignatureInvalid {
-			panic(echo.NewHTTPError(http.StatusUnauthorized, "Please provide valid credentials"))
-		}
-
-		panic(echo.NewHTTPError(http.StatusUnprocessableEntity, "Please relogin"))
-	}
-
-	if !token.Valid {
-		panic(echo.NewHTTPError(http.StatusUnauthorized, "Please provide valid credentials"))
-	}
-
-	return claimData
+	return claimData, err
 }
 
 //on register or renew token
@@ -150,19 +134,14 @@ func AESDecrypt(data string, secret string)(string) {
 
 //Send gmail func
 func SendSMTPMail(to []string, subject string, content string)(error){
-	godotenv.Load(".env")
-	mail_host := os.Getenv("MAIL_HOST")
-	mail_from := os.Getenv("MAIL_FROM")
-	mail_psw := os.Getenv("MAIL_PSW")
-	mail_port := os.Getenv("MAIL_PORT")
 
-	auth := smtp.PlainAuth("", mail_from, mail_psw, mail_host)
+	auth := smtp.PlainAuth("", (*envData).MAIL_FROM, (*envData).MAIL_PSW, (*envData).MAIL_HOST)
 	mime := "MIME-version: 1.0;\nContent-Type: text/html; charset=\"UTF-8\";\n\n"
 
 	msg := []byte(subject + mime + "\n" + content)
-	address := fmt.Sprintf("%s:%s", mail_host, mail_port)
+	address := fmt.Sprintf("%s:%s", (*envData).MAIL_HOST, (*envData).MAIL_PORT)
 
-	if err := smtp.SendMail(address, auth, mail_from, to, msg); err != nil {
+	if err := smtp.SendMail(address, auth, (*envData).MAIL_FROM, to, msg); err != nil {
 			return errors.New("Something wrong on email sent")
 	}
 

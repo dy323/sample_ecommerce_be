@@ -1,23 +1,24 @@
 package controller
 
 import (
-	"github.com/joho/godotenv"
 	"gorm.io/gorm"
 	"github.com/labstack/echo/v4"
 	"net/http"
-	"os"
 	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/bcrypt"
 	"ecommerce/model"
 	"ecommerce/auth"
 	"ecommerce/db"
 	"ecommerce/queue"
+	"ecommerce/config"
 	"math/rand"
 	"time"
 	"errors"
 	"github.com/dirkaholic/kyoo/job"
 	"fmt"
 )
+
+var envData = config.EnvConfig()
 
 type params struct {
 	Username string `json: "username"`
@@ -32,10 +33,8 @@ type claims struct {
 
 //sub func to send verification email, used on register and login
 func SendVerificationMail(info model.User, encrypted string)(error){
-	godotenv.Load(".env")
-	host := os.Getenv("HOST")
 
-	verifyLink := host + "verify/" + encrypted
+	verifyLink := (*envData).HOST + "verify/" + encrypted
 
 	subject := "Subject: " + "Sample Verification Email" + "!\n"
 
@@ -51,8 +50,6 @@ func SendVerificationMail(info model.User, encrypted string)(error){
 
 //login
 func Login(c echo.Context)(err error) {
-	godotenv.Load(".env")
-	aes_secret := os.Getenv("AES_SECRET")
 
 	current := time.Now()
 	var user model.User
@@ -89,7 +86,7 @@ func Login(c echo.Context)(err error) {
 			db.DB.Delete(&model.Token{}, user.Token.TokenID)
 
 			//create new token
-			encrypted := auth.AESEncrypt(user.Username, aes_secret)
+			encrypted := auth.AESEncrypt(user.Username, (*envData).AES_SECRET)
 
 			if encrypted == "500" {
 				return echo.NewHTTPError(http.StatusInternalServerError, "Encryption Error") 
@@ -123,8 +120,6 @@ func Login(c echo.Context)(err error) {
 
 //register
 func Register(c echo.Context)(err error) {
-	godotenv.Load(".env")
-	aes_secret := os.Getenv("AES_SECRET")
 
 	var users model.User
 	var query params
@@ -157,7 +152,7 @@ func Register(c echo.Context)(err error) {
 	info := model.User{UserID: uint(userIdentity), Username: query.Username, Email: query.Email, Password: string(psw), Date: time.Now(), MemberShip: uint(2)}
 
 	//Create Token
-	encrypted := auth.AESEncrypt(info.Username, aes_secret)
+	encrypted := auth.AESEncrypt(info.Username, (*envData).AES_SECRET)
 
 	if encrypted == "500" {
 		return echo.NewHTTPError(http.StatusInternalServerError, "Encryption Error") 
